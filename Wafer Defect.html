@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="zh-TW" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智慧晶圓缺陷分析系統 | 互動式報告</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Chosen Palette: Cool Neutrals & Tech Blue -->
+    <!-- Application Structure Plan: The application is designed as a narrative journey, guiding the user from the fundamental problem of manual wafer inspection to a comprehensive vision of a production-ready Automated Defect Analysis (ADA) system. This top-down, phased approach synthesizes both source reports into a single, logical flow. It starts with the "Why" (the problem), progresses through the "How" (a five-phase implementation plan from basic to advanced), and concludes with "What" (the key technologies and validation methods). This structure was chosen over a simple report summary to create an educational and engaging user experience, making complex technical concepts more accessible and digestible for a broader audience, from students to project managers. -->
+    <!-- Visualization & Content Choices: 
+        - Report Info: Defect Types -> Goal: Organize/Inform -> Viz: Bar Chart (Chart.js) -> Interaction: Hover tooltips -> Justification: Clearly shows the distribution of common defect types, which is a foundational concept.
+        - Report Info: Evaluation Metrics (Precision/Recall) -> Goal: Explain Relationship -> Viz: Interactive Line Chart (Chart.js) -> Interaction: A slider manipulates the "decision threshold", dynamically updating the chart and highlighting the trade-off between Precision and Recall. -> Justification: Transforms a static concept into a memorable, hands-on learning experience.
+        - Report Info: System Workflows (SAHI, Data Flow, RAG) -> Goal: Explain Processes -> Viz: Diagrams (HTML/CSS/Tailwind) -> Interaction: Hover effects to highlight components, subtle animations. -> Justification: Custom-built diagrams using divs and flexbox/grid provide a clean, integrated look that perfectly matches the app's theme, offering more flexibility and better performance than static images, while adhering to the NO SVG/Mermaid constraint.
+        - Report Info: Project Phases & Technical Concepts -> Goal: Structure/Organize -> Viz: Tabbed Interface & Cards (HTML/CSS/JS) -> Interaction: Clicking tabs reveals detailed content for each phase. -> Justification: Organizes a large amount of information into manageable chunks, preventing cognitive overload and allowing users to explore at their own pace.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', 'Helvetica Neue', 'Helvetica', 'Arial', 'Microsoft JhengHei', sans-serif;
+            background-color: #f8fafc; /* slate-50 */
+        }
+        .tab-active {
+            border-color: #3b82f6; /* blue-500 */
+            color: #3b82f6;
+            background-color: #eff6ff; /* blue-50 */
+        }
+        .tab-inactive {
+            border-color: transparent;
+            color: #475569; /* slate-600 */
+        }
+        .flowchart-node {
+            transition: all 0.3s ease-in-out;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+        .flowchart-node:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        }
+        .flowchart-arrow {
+            position: relative;
+            width: 1.5rem; /* w-6 */
+            height: 2px;
+            background-color: #94a3b8; /* slate-400 */
+        }
+        .flowchart-arrow::after {
+            content: '';
+            position: absolute;
+            right: -1px;
+            top: -4px;
+            border-style: solid;
+            border-width: 5px 0 5px 8px;
+            border-color: transparent transparent transparent #94a3b8; /* slate-400 */
+        }
+        .flowchart-arrow-down {
+            position: relative;
+            height: 1.5rem; /* h-6 */
+            width: 2px;
+            background-color: #94a3b8; /* slate-400 */
+        }
+         .flowchart-arrow-down::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: -4px;
+            border-style: solid;
+            border-width: 8px 5px 0 5px;
+            border-color: #94a3b8 transparent transparent transparent; /* slate-400 */
+        }
+        [data-tooltip]:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            margin-bottom: 5px;
+            background: #1e293b;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.875rem;
+            white-space: nowrap;
+            z-index: 10;
+        }
+        [data-tooltip] {
+            position: relative;
+        }
+    </style>
+</head>
+<body class="text-slate-700">
+
+    <!-- Header & Navigation -->
+    <header id="header" class="bg-white/80 backdrop-blur-lg sticky top-0 z-50 shadow-sm">
+        <nav class="container mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-microchip text-2xl text-blue-600"></i>
+                    </div>
+                    <div class="ml-4">
+                        <h1 class="text-lg font-bold text-slate-800">智慧晶圓缺陷分析系統</h1>
+                    </div>
+                </div>
+                <div class="hidden md:block">
+                    <div class="ml-10 flex items-baseline space-x-4">
+                        <a href="#problem" class="text-slate-600 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">核心問題</a>
+                        <a href="#solution" class="text-slate-600 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">解決方案</a>
+                        <a href="#tech" class="text-slate-600 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">關鍵技術</a>
+                        <a href="#validation" class="text-slate-600 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">系統驗證</a>
+                    </div>
+                </div>
+                <div class="md:hidden">
+                    <button id="mobile-menu-button" class="inline-flex items-center justify-center p-2 rounded-md text-slate-400 hover:text-slate-500 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500">
+                        <span class="sr-only">Open main menu</span>
+                        <i class="fas fa-bars text-xl"></i>
+                    </button>
+                </div>
+            </div>
+        </nav>
+        <div id="mobile-menu" class="md:hidden hidden">
+            <div class="px-2 pt-2 pb-3 space-y-1 sm:px-3">
+                <a href="#problem" class="text-slate-600 hover:text-blue-600 block px-3 py-2 rounded-md text-base font-medium">核心問題</a>
+                <a href="#solution" class="text-slate-600 hover:text-blue-600 block px-3 py-2 rounded-md text-base font-medium">解決方案</a>
+                <a href="#tech" class="text-slate-600 hover:text-blue-600 block px-3 py-2 rounded-md text-base font-medium">關鍵技術</a>
+                <a href="#validation" class="text-slate-600 hover:text-blue-600 block px-3 py-2 rounded-md text-base font-medium">系統驗證</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main>
+        <!-- Hero Section -->
+        <section class="bg-white py-20 sm:py-24">
+            <div class="container mx-auto px-4 sm:px-6 lg:px-8 text-center">
+                <h2 class="text-4xl font-extrabold tracking-tight text-slate-900 sm:text-5xl md:text-6xl">
+                    從<span class="text-blue-600">像素</span>到<span class="text-blue-600">洞見</span>
+                </h2>
+                <p class="mt-6 max-w-2xl mx-auto text-lg text-slate-600">
+                    本報告將引領您探索如何建構一套自動化晶圓缺陷分析 (ADA) 系統。我們將從專案的基礎構想出發，逐步深入到一個整合 AI、雲端技術與大型語言模型的生產級戰略藍圖。
+                </p>
+                <div class="mt-10">
+                    <a href="#problem" class="inline-block bg-blue-600 text-white font-bold py-3 px-8 rounded-lg text-lg hover:bg-blue-700 transition-colors">
+                        啟動探索之旅
+                        <i class="fas fa-arrow-right ml-2"></i>
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <!-- The Core Problem Section -->
+        <section id="problem" class="py-16 sm:py-20">
+            <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="text-center mb-12">
+                    <h2 class="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">核心問題：看不見的成本</h2>
+                    <p class="mt-4 max-w-2xl mx-auto text-lg text-slate-600">傳統的晶圓失效分析高度依賴人力，不僅耗時，更容易在微小的細節中出錯，導致巨大的良率損失。</p>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+                    <div class="bg-white p-8 rounded-lg shadow-lg border border-slate-200">
+                        <div class="flex items-center text-red-500">
+                            <i class="fas fa-user-clock text-4xl"></i>
+                            <h3 class="ml-4 text-2xl font-bold text-slate-800">傳統人工檢測</h3>
+                        </div>
+                        <ul class="mt-6 space-y-4 text-slate-600">
+                            <li class="flex items-start"><i class="fas fa-times-circle mt-1 mr-3 text-red-400"></i><div><strong>高度耗時：</strong>分析師需花費數小時甚至數天在顯微鏡下判讀。</div></li>
+                            <li class="flex items-start"><i class="fas fa-times-circle mt-1 mr-3 text-red-400"></i><div><strong>主觀性強：</strong>判斷標準依賴個人經驗，容易產生疏漏與不一致。</div></li>
+                            <li class="flex items-start"><i class="fas fa-times-circle mt-1 mr-3 text-red-400"></i><div><strong>難以追溯：</strong>分析結果多為靜態報告，數據難以整合與再利用。</div></li>
+                            <li class="flex items-start"><i class="fas fa-times-circle mt-1 mr-3 text-red-400"></i><div><strong>錯失良機：</strong>無法即時回饋製程，錯過改善良率的黃金時間。</div></li>
+                        </ul>
+                    </div>
+                     <div class="bg-white p-8 rounded-lg shadow-lg border border-slate-200">
+                        <div class="flex items-center text-green-500">
+                            <i class="fas fa-robot text-4xl"></i>
+                            <h3 class="ml-4 text-2xl font-bold text-slate-800">自動化分析願景</h3>
+                        </div>
+                        <ul class="mt-6 space-y-4 text-slate-600">
+                            <li class="flex items-start"><i class="fas fa-check-circle mt-1 mr-3 text-green-400"></i><div><strong>極速分析：</strong>AI 模型在數分鐘內完成全晶圓掃描，速度提升百倍。</div></li>
+                            <li class="flex items-start"><i class="fas fa-check-circle mt-1 mr-3 text-green-400"></i><div><strong>客觀一致：</strong>標準化的 AI 模型確保了全天候一致的檢測品質。</div></li>
+                            <li class="flex items-start"><i class="fas fa-check-circle mt-1 mr-3 text-green-400"></i><div><strong>數據驅動：</strong>所有缺陷數據被結構化儲存，便於趨勢分析與根本原因探究。</div></li>
+                            <li class="flex items-start"><i class="fas fa-check-circle mt-1 mr-3 text-green-400"></i><div><strong>即時回饋：</strong>快速連結 YMS 系統，實現製程閉環控制，持續優化良率。</div></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- The Solution Section -->
+        <section id="solution" class="bg-white py-16 sm:py-20">
+            <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="text-center mb-12">
+                    <h2 class="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">建構之路：五階段實施藍圖</h2>
+                    <p class="mt-4 max-w-3xl mx-auto text-lg text-slate-600">我們將專案的實現路徑拆分為五個循序漸進的階段。您可以點選下方頁籤，探索從建立基礎模型到整合前沿 LLM 技術的完整過程。</p>
+                </div>
+
+                <!-- Tabs Navigation -->
+                <div class="mb-8 border-b border-slate-200">
+                    <nav class="-mb-px flex flex-wrap justify-center space-x-2 sm:space-x-4" aria-label="Tabs">
+                        <button class="tab-btn tab-active whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm" data-tab="1">
+                            <i class="fas fa-database mr-2"></i>1. 奠定基石
+                        </button>
+                        <button class="tab-btn tab-inactive whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm" data-tab="2">
+                            <i class="fas fa-tachometer-alt mr-2"></i>2. 分析師駕駛艙
+                        </button>
+                        <button class="tab-btn tab-inactive whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm" data-tab="3">
+                            <i class="fas fa-cogs mr-2"></i>3. 生產級增強
+                        </button>
+                         <button class="tab-btn tab-inactive whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm" data-tab="4">
+                            <i class="fas fa-industry mr-2"></i>4. 融入工廠生態
+                        </button>
+                        <button class="tab-btn tab-inactive whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm" data-tab="5">
+                            <i class="fas fa-brain mr-2"></i>5. 未來展望
+                        </button>
+                    </nav>
+                </div>
+
+                <!-- Tabs Content -->
+                <div id="tabs-content" class="mt-8">
+                    <!-- Tab 1: Foundation -->
+                    <div class="tab-content" id="tab-1">
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+                            <div class="order-2 lg:order-1">
+                                <h3 class="text-2xl font-bold text-slate-800 mb-4">階段一：奠定基石 - 數據與基礎模型</h3>
+                                <p class="text-slate-600 mb-4">一切始於高品質的數據。這個階段的核心任務是建立一個標註清晰的缺陷數據集，並利用它來訓練一個初步的物件偵測模型 (YOLOv8)。這是整個系統能夠「看見」並「理解」缺陷的基礎。</p>
+                                <ul class="space-y-3 text-slate-600">
+                                    <li class="flex"><i class="fas fa-check text-blue-500 mt-1 mr-3"></i><div><strong>定義缺陷本體論：</strong>根據專家經驗，定義約10種關鍵缺陷類別。</div></li>
+                                    <li class="flex"><i class="fas fa-check text-blue-500 mt-1 mr-3"></i><div><strong>數據收集與標註：</strong>收集至少100張影像，使用 LabelImg 等工具進行精確標註。</div></li>
+                                    <li class="flex"><i class="fas fa-check text-blue-500 mt-1 mr-3"></i><div><strong>訓練YOLOv8模型：</strong>使用 Ultralytics 函式庫，以預訓練的 `yolov8n.pt` 為起點，快速訓練出客製化模型。</div></li>
+                                </ul>
+                            </div>
+                            <div class="order-1 lg:order-2">
+                                <div class="bg-slate-100 p-4 rounded-lg">
+                                    <div class="chart-container" style="position: relative; height:40vh; max-height: 400px; width:100%; max-width: 600px; margin: auto;">
+                                        <canvas id="defectDistributionChart"></canvas>
+                                    </div>
+                                </div>
+                                 <p class="text-center mt-2 text-sm text-slate-500">圖1：常見晶圓缺陷類型分佈（示意圖）</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tab 2: Analyst's Cockpit -->
+                    <div class="tab-content hidden" id="tab-2">
+                        <div class="text-center">
+                            <h3 class="text-2xl font-bold text-slate-800 mb-4">階段二：打造分析師的駕駛艙 - 互動式儀表板</h3>
+                            <p class="max-w-3xl mx-auto text-slate-600 mb-8">模型本身不足以創造價值，我們需要一個強大的人機介面。此階段專注於開發一個專為失效分析 (FA) 工程師設計的互動式儀表板，將 AI 的分析結果以最直觀的方式呈現。</p>
+                            <div class="bg-slate-800 p-4 rounded-xl shadow-2xl max-w-4xl mx-auto">
+                                <div class="bg-slate-900 rounded-t-lg p-2 flex items-center">
+                                    <div class="flex space-x-1.5">
+                                        <div class="w-3 h-3 bg-red-500 rounded-full"></div>
+                                        <div class="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                                        <div class="w-3 h-3 bg-green-500 rounded-full"></div>
+                                    </div>
+                                    <p class="text-slate-400 text-sm ml-4">ADA Cockpit - Wafer Lot XYZ-123</p>
+                                </div>
+                                <img src="https://placehold.co/1000x600/1e293b/94a3b8?text=Interactive+Wafer+Map+UI\n(OpenSeadragon+DZI+View)" alt="儀表板示意圖" class="w-full h-auto rounded-b-lg object-cover">
+                            </div>
+                             <div class="mt-8 text-left max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div data-tooltip="使用金字塔圖塊技術，流暢縮放GB等級的超高解析度影像。">
+                                    <h4 class="font-bold text-slate-800"><i class="fas fa-search-plus text-blue-500 mr-2"></i>深度縮放 (Deep Zoom)</h4>
+                                    <p class="text-slate-600">採用 OpenSeadragon.js 函式庫，實現如 Google Maps 般流暢的縮放與平移體驗，輕鬆檢視微米級的細節。</p>
+                                </div>
+                                <div data-tooltip="將模型檢測出的缺陷框，直接繪製在晶圓圖對應位置。">
+                                    <h4 class="font-bold text-slate-800"><i class="fas fa-layer-group text-blue-500 mr-2"></i>智慧資訊疊加</h4>
+                                    <p class="text-slate-600">將 YOLO 的檢測結果（位置、類別、信心度）動態繪製為疊加層，讓缺陷位置一目了然。</p>
+                                </div>
+                                <div data-tooltip="工程師可直接在UI上修正標註，回饋的數據將用於模型的持續學習。">
+                                    <h4 class="font-bold text-slate-800"><i class="fas fa-mouse-pointer text-blue-500 mr-2"></i>互動式回饋迴圈</h4>
+                                    <p class="text-slate-600">建立人機協作機制。工程師可點選、修正或標註新的缺陷，這些寶貴的回饋將用於優化未來的模型。</p>
+                                </div>
+                                 <div data-tooltip="透過Grad-CAM等技術生成熱圖，顯示模型做出判斷時關注的區域。">
+                                    <h4 class="font-bold text-slate-800"><i class="fas fa-fire text-blue-500 mr-2"></i>可解釋性 AI (XAI)</h4>
+                                    <p class="text-slate-600">整合 Grad-CAM 等技術生成視覺化熱圖，幫助工程師理解 AI 的決策依據，從而建立信任。</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tab 3: Production Enhancements -->
+                    <div class="tab-content hidden" id="tab-3">
+                         <h3 class="text-2xl text-center font-bold text-slate-800 mb-4">階段三：生產級增強 - 應對真實世界的挑戰</h3>
+                         <p class="max-w-3xl text-center mx-auto text-slate-600 mb-8">為了讓系統能穩定地在真實產線上運作，我們必須解決兩個關鍵難題：如何偵測微小到幾乎看不見的缺陷，以及如何應對新缺陷類型出現時的數據稀缺問題。</p>
+                         <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                             <div class="bg-white p-6 rounded-lg border">
+                                 <h4 class="font-bold text-xl text-slate-800 mb-3"><i class="fas fa-th-large text-blue-500 mr-2"></i>SAHI：微小缺陷的放大鏡</h4>
+                                 <p class="text-slate-600 mb-4">切片輔助超高解析度推論 (SAHI) 技術，將高解析度影像切成重疊的小塊進行分析，能大幅提升對微小目標的檢出率。</p>
+                                 <div class="flex flex-col items-center p-4 bg-slate-50 rounded-lg">
+                                    <div class="flowchart-node bg-white p-3 rounded-lg w-full max-w-xs text-center">高解析度晶圓圖</div>
+                                    <div class="flowchart-arrow-down my-2"></div>
+                                    <div class="text-sm text-slate-500 mb-2">SAHI 切片處理</div>
+                                    <div class="grid grid-cols-3 gap-2 w-full max-w-xs">
+                                        <div class="bg-white h-12 border-2 border-dashed border-blue-400 rounded"></div>
+                                        <div class="bg-white h-12 border-2 border-dashed border-blue-400 rounded"></div>
+                                        <div class="bg-white h-12 border-2 border-dashed border-blue-400 rounded"></div>
+                                        <div class="bg-white h-12 border-2 border-dashed border-blue-400 rounded"></div>
+                                        <div class="bg-white h-12 border-2 border-dashed border-blue-400 rounded"></div>
+                                        <div class="bg-white h-12 border-2 border-dashed border-blue-400 rounded"></div>
+                                    </div>
+                                    <div class="flowchart-arrow-down my-2"></div>
+                                    <div class="flowchart-node bg-white p-3 rounded-lg w-full max-w-xs text-center">獨立推論 & 合併結果</div>
+                                 </div>
+                             </div>
+                              <div class="bg-white p-6 rounded-lg border">
+                                 <h4 class="font-bold text-xl text-slate-800 mb-3"><i class="fas fa-magic text-blue-500 mr-2"></i>生成式 AI：無中生有的數據</h4>
+                                 <p class="text-slate-600 mb-4">當新缺陷樣本稀少時，我們利用擴散模型 (Diffusion Model) 等生成技術，基於少量真實樣本，創造出大量高度逼真的合成缺陷數據。</p>
+                                 <div class="flex items-center justify-center p-4 bg-slate-50 rounded-lg h-full">
+                                     <div class="flex items-center space-x-2 md:space-x-4">
+                                        <div class="text-center">
+                                            <div class="w-24 h-24 bg-white rounded-lg shadow-md flex items-center justify-center border-2 border-green-400">
+                                                <i class="fas fa-image text-3xl text-green-500"></i>
+                                            </div>
+                                            <p class="text-xs mt-1">真實樣本 (少量)</p>
+                                        </div>
+                                        <div class="flowchart-arrow"></div>
+                                        <div class="flowchart-node bg-blue-500 text-white p-4 rounded-full flex-shrink-0">
+                                            <i class="fas fa-brain text-2xl"></i>
+                                            <p class="text-xs font-bold">擴散模型</p>
+                                        </div>
+                                         <div class="flowchart-arrow"></div>
+                                        <div class="text-center">
+                                            <div class="w-24 h-24 bg-white rounded-lg shadow-md flex items-center justify-center border-2 border-purple-400">
+                                                <i class="fas fa-images text-3xl text-purple-500"></i>
+                                            </div>
+                                            <p class="text-xs mt-1">合成數據 (大量)</p>
+                                        </div>
+                                     </div>
+                                 </div>
+                             </div>
+                         </div>
+                    </div>
+                    
+                    <!-- Tab 4: Factory Integration -->
+                    <div class="tab-content hidden" id="tab-4">
+                        <h3 class="text-2xl text-center font-bold text-slate-800 mb-4">階段四：融入工廠生態系統</h3>
+                        <p class="max-w-3xl text-center mx-auto text-slate-600 mb-12">一個成功的系統不能是孤島。它必須能無縫地與現有的工廠數據基礎設施整合，讀取標準格式的數據，並將分析結果反饋給良率管理系統 (YMS)。</p>
+                        <div class="bg-white p-6 rounded-lg border">
+                            <h4 class="text-center font-bold text-lg text-slate-800 mb-6">數據流與系統整合圖</h4>
+                             <div class="flex flex-col md:flex-row items-center justify-center space-y-4 md:space-y-0 md:space-x-4">
+                                <div class="flowchart-node bg-slate-200 p-4 rounded-lg text-center" data-tooltip="KLA-Tencor 結果檔案，業界標準的缺陷數據格式。">
+                                    <i class="fas fa-file-alt text-3xl text-slate-600 mb-2"></i>
+                                    <p class="font-bold">檢測設備 (KLARF)</p>
+                                </div>
+                                <div class="hidden md:block flowchart-arrow"></div>
+                                <div class="md:hidden flowchart-arrow-down"></div>
+                                <div class="flowchart-node bg-blue-500 text-white p-4 rounded-lg text-center" data-tooltip="部署在產線邊緣的 AI 推論模型，實現低延遲分析。">
+                                    <i class="fas fa-server text-3xl mb-2"></i>
+                                    <p class="font-bold">ADA 邊緣系統</p>
+                                </div>
+                                <div class="hidden md:block flowchart-arrow"></div>
+                                <div class="md:hidden flowchart-arrow-down"></div>
+                                <div class="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4">
+                                    <div class="flowchart-node bg-green-500 text-white p-4 rounded-lg text-center" data-tooltip="良率管理系統，用於監控和分析良率數據。">
+                                        <i class="fas fa-chart-line text-3xl mb-2"></i>
+                                        <p class="font-bold">良率系統 (YMS)</p>
+                                    </div>
+                                    <div class="hidden md:block flowchart-arrow"></div>
+                                    <div class="md:hidden flowchart-arrow-down"></div>
+                                    <div class="flowchart-node bg-purple-500 text-white p-4 rounded-lg text-center" data-tooltip="FA 工程師透過互動式儀表板進行分析與回饋。">
+                                        <i class="fas fa-user-check text-3xl mb-2"></i>
+                                        <p class="font-bold">專家回饋迴圈</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
+                                <p><strong class="text-slate-800">1. 數據擷取：</strong>系統需具備解析 KLARF、SEMI E142 等行業標準格式的能力。</p>
+                                <p><strong class="text-slate-800">2. 混合架構：</strong>模型推論在「邊緣端」完成以降低延遲，模型訓練和數據儲存在「雲端」。</p>
+                                <p><strong class="text-slate-800">3. 閉環控制：</strong>透過 API 將結構化的分析結果傳送給 YMS，實現快速的製程糾正與良率提升。</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Tab 5: The Future -->
+                    <div class="tab-content hidden" id="tab-5">
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+                            <div>
+                                <h3 class="text-2xl font-bold text-slate-800 mb-4">階段五：未來展望 - LLM 驅動的根本原因分析</h3>
+                                <p class="text-slate-600 mb-4">最終的目標是讓系統不僅能回答「是什麼缺陷」，更能輔助回答「為什麼會產生這個缺陷」。我們將引入大型語言模型 (LLM)，打造一個能用自然語言進行對話式分析的智慧代理 (Agent)。</p>
+                                <p class="text-slate-600 mb-4">此代理將採用 **檢索增強生成 (RAG)** 架構，使其能夠「接地氣地」查詢工廠的即時數據庫、歷史報告和設備規格書，從而提供有事實依據的、深刻的分析洞見。</p>
+                            </div>
+                            <div class="bg-slate-800 p-4 rounded-lg shadow-lg">
+                                <div class="bg-slate-700 text-white p-4 rounded-lg font-mono text-sm">
+                                    <div class="flex items-start mb-4">
+                                        <span class="text-green-400 mr-2">FA Engineer:</span>
+                                        <span class="text-slate-300">查詢批號 XYZ-123 中，出現高密度 Edge-Ring 缺陷的晶圓，它們在蝕刻機台上的壓力參數有何異常？</span>
+                                    </div>
+                                    <div class="flex items-start">
+                                        <span class="text-blue-400 mr-2">ADA Agent:</span>
+                                        <div class="text-slate-300">
+                                            <p>好的，正在分析... 🧐</p>
+                                            <ol class="list-decimal list-inside mt-2 space-y-1">
+                                                <li><span class="text-yellow-400">[執行 Text-to-SQL]</span> 查詢資料庫，找到 3 片晶圓符合條件。</li>
+                                                <li><span class="text-yellow-400">[查詢 SECS/GEM 數據]</span> 發現這 3 片晶圓在蝕刻步驟 5 的腔體壓力均值 (1.2 torr) 比平均值 (0.8 torr) 高出 50%。</li>
+                                                <li><span class="text-yellow-400">[檢索歷史報告]</span> 找到一份報告指出，壓力過高曾導致類似的 Edge-Ring 問題。</li>
+                                                <li><strong class="text-white mt-2 block">結論：</strong>高機率是蝕刻機台壓力異常導致了此批次的缺陷。建議檢查壓力控制器。</li>
+                                            </ol>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Key Technologies Section -->
+        <section id="tech" class="py-16 sm:py-20">
+             <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="text-center mb-12">
+                    <h2 class="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">關鍵技術棧</h2>
+                    <p class="mt-4 max-w-2xl mx-auto text-lg text-slate-600">本系統的實現依賴於一系列尖端且成熟的開源技術。</p>
+                </div>
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-8 text-center">
+                    <div class="flex flex-col items-center">
+                        <div class="bg-white flex items-center justify-center w-24 h-24 rounded-full shadow-md mb-4"><i class="fab fa-python text-5xl text-blue-500"></i></div>
+                        <h4 class="font-bold text-slate-800">Python</h4>
+                        <p class="text-sm text-slate-500">後端與 AI 核心語言</p>
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <div class="bg-white flex items-center justify-center w-24 h-24 rounded-full shadow-md mb-4"><span class="font-bold text-2xl text-orange-500">YOLO</span></div>
+                        <h4 class="font-bold text-slate-800">YOLOv8</h4>
+                        <p class="text-sm text-slate-500">高效物件偵測模型</p>
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <div class="bg-white flex items-center justify-center w-24 h-24 rounded-full shadow-md mb-4"><i class="fas fa-cubes text-4xl text-green-500"></i></div>
+                        <h4 class="font-bold text-slate-800">OpenSeadragon</h4>
+                        <p class="text-sm text-slate-500">高解析度影像檢視</p>
+                    </div>
+                     <div class="flex flex-col items-center">
+                        <div class="bg-white flex items-center justify-center w-24 h-24 rounded-full shadow-md mb-4"><i class="fas fa-magic text-4xl text-purple-500"></i></div>
+                        <h4 class="font-bold text-slate-800">Diffusion Models</h4>
+                        <p class="text-sm text-slate-500">合成數據生成</p>
+                    </div>
+                    <div class="flex flex-col items-center">
+                         <div class="bg-white flex items-center justify-center w-24 h-24 rounded-full shadow-md mb-4"><i class="fas fa-brain text-4xl text-red-500"></i></div>
+                        <h4 class="font-bold text-slate-800">LLM / RAG</h4>
+                        <p class="text-sm text-slate-500">智慧分析代理</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Validation Section -->
+        <section id="validation" class="bg-white py-16 sm:py-20">
+            <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="text-center mb-12">
+                    <h2 class="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">嚴謹的系統驗證</h2>
+                    <p class="mt-4 max-w-2xl mx-auto text-lg text-slate-600">一個生產級系統的價值必須被量化。我們採用比「準確率」更嚴謹的指標來評估模型性能，並理解其間的權衡。</p>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+                    <div>
+                        <h3 class="text-2xl font-bold text-slate-800 mb-4">精確率 (Precision) vs. 召回率 (Recall)</h3>
+                        <p class="text-slate-600 mb-4">在缺陷檢測中，數據極度不平衡，「準確率」是個陷阱。我們更關注兩個核心指標：</p>
+                        <ul class="space-y-4">
+                            <li>
+                                <strong class="text-blue-600">精確率 (Precision)</strong>
+                                <p class="text-slate-600">回答：「在模型找到的所有缺陷中，有多少是真實的？」<br><em class="text-sm">目標：減少誤報，節省工程師的審查時間。</em></p>
+                            </li>
+                            <li>
+                                <strong class="text-red-600">召回率 (Recall)</strong>
+                                <p class="text-slate-600">回答：「在所有真實存在的缺陷中，模型找到了多少？」<br><em class="text-sm">目標：減少漏報，避免有問題的晶片流入客戶手中。</em></p>
+                            </li>
+                        </ul>
+                        <div class="mt-8">
+                            <label for="threshold-slider" class="block font-medium text-slate-700">決策信心度閾值 (Threshold): <span id="threshold-value" class="font-bold text-blue-600">0.50</span></label>
+                            <input id="threshold-slider" type="range" min="0" max="1" step="0.01" value="0.5" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer">
+                            <p class="text-sm text-slate-500 mt-2">請拖動滑桿，觀察精確率與召回率之間的動態變化。</p>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="chart-container" style="position: relative; height:50vh; max-height: 450px; width:100%; max-width: 600px; margin: auto;">
+                            <canvas id="prCurveChart"></canvas>
+                        </div>
+                        <p class="text-center mt-2 text-sm text-slate-500">圖2：精確率-召回率曲線 (PR Curve)</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-slate-800 text-slate-400">
+        <div class="container mx-auto py-8 px-4 sm:px-6 lg:px-8 text-center">
+            <p>&copy; 2025 智慧晶圓缺陷分析系統專案。基於開源技術建構。</p>
+            <p class="text-xs mt-2">此為根據專案報告生成的互動式概念應用，非實際操作系統。</p>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Mobile menu toggle
+            const mobileMenuButton = document.getElementById('mobile-menu-button');
+            const mobileMenu = document.getElementById('mobile-menu');
+            mobileMenuButton.addEventListener('click', () => {
+                mobileMenu.classList.toggle('hidden');
+            });
+            
+            // Close mobile menu on link click
+            document.querySelectorAll('#mobile-menu a').forEach(link => {
+                link.addEventListener('click', () => {
+                    mobileMenu.classList.add('hidden');
+                });
+            });
+
+            // Tabs functionality
+            const tabButtons = document.querySelectorAll('.tab-btn');
+            const tabContents = document.querySelectorAll('.tab-content');
+
+            tabButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    const tabId = button.dataset.tab;
+
+                    tabButtons.forEach(btn => {
+                        btn.classList.remove('tab-active');
+                        btn.classList.add('tab-inactive');
+                    });
+                    button.classList.add('tab-active');
+                    button.classList.remove('tab-inactive');
+
+                    tabContents.forEach(content => {
+                        content.classList.add('hidden');
+                    });
+                    document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+                });
+            });
+
+            // Chart.js: Defect Distribution Chart
+            const defectCtx = document.getElementById('defectDistributionChart').getContext('2d');
+            new Chart(defectCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['Scratch', 'Edge-Ring', 'Center', 'Donut', 'Edge-Loc', 'Random', 'Near-full', 'Other'],
+                    datasets: [{
+                        label: '缺陷數量',
+                        data: [65, 59, 80, 81, 56, 55, 40, 30],
+                        backgroundColor: 'rgba(59, 130, 246, 0.5)',
+                        borderColor: 'rgba(59, 130, 246, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: '晶圓缺陷類型分佈',
+                            font: { size: 16 }
+                        },
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: { display: true, text: '數量' }
+                        },
+                        x: {
+                            title: { display: true, text: '缺陷類型' }
+                        }
+                    }
+                }
+            });
+
+            // Chart.js: Interactive Precision-Recall Curve
+            const prCtx = document.getElementById('prCurveChart').getContext('2d');
+            const slider = document.getElementById('threshold-slider');
+            const thresholdValueSpan = document.getElementById('threshold-value');
+
+            const recallData = [1.0, 0.98, 0.95, 0.92, 0.88, 0.82, 0.75, 0.65, 0.5, 0.3, 0.1, 0.0];
+            const precisionData = [0.1, 0.15, 0.25, 0.35, 0.48, 0.6, 0.72, 0.85, 0.92, 0.95, 0.98, 1.0];
+            const thresholds = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 1.0];
+            
+            const prChart = new Chart(prCtx, {
+                type: 'line',
+                data: {
+                    labels: recallData,
+                    datasets: [
+                        {
+                            label: 'Precision-Recall Curve',
+                            data: precisionData,
+                            borderColor: 'rgba(239, 68, 68, 0.8)',
+                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                            fill: false,
+                            tension: 0.1
+                        },
+                        {
+                            label: '目前閾值點',
+                            data: [],
+                            borderColor: 'rgba(59, 130, 246, 1)',
+                            backgroundColor: 'rgba(59, 130, 246, 1)',
+                            pointRadius: 8,
+                            pointHoverRadius: 10,
+                            type: 'scatter',
+                            showLine: false,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: '精確率 vs. 召回率',
+                            font: { size: 16 }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                title: function(context) { return `召回率: ${context[0].label}`; },
+                                label: function(context) { return `精確率: ${context.raw.toFixed(2)}`; }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            position: 'bottom',
+                            title: {
+                                display: true,
+                                text: '召回率 (Recall)'
+                            },
+                            min: 0,
+                            max: 1.0
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: '精確率 (Precision)'
+                            },
+                            min: 0,
+                            max: 1.0
+                        }
+                    }
+                }
+            });
+
+            function updateChart(threshold) {
+                thresholdValueSpan.textContent = parseFloat(threshold).toFixed(2);
+                let closestIndex = 0;
+                let minDiff = 1;
+                thresholds.forEach((t, i) => {
+                    const diff = Math.abs(t - threshold);
+                    if (diff < minDiff) {
+                        minDiff = diff;
+                        closestIndex = i;
+                    }
+                });
+                
+                const currentRecall = recallData[closestIndex];
+                const currentPrecision = precisionData[closestIndex];
+                
+                prChart.data.datasets[1].data = [{ x: currentRecall, y: currentPrecision }];
+                prChart.update();
+            }
+
+            slider.addEventListener('input', (e) => {
+                updateChart(e.target.value);
+            });
+
+            // Initial chart update
+            updateChart(slider.value);
+        });
+    </script>
+
+</body>
+</html>
